@@ -3,13 +3,14 @@
 Phone-first app that forecasts Dhaka Stock Exchange closing prices with the per-share LSTM from `predictive_analytics_LSTM.ipynb`.
 
 ##requirements.txt
-streamlit>=1.40
-pandas
-numpy
-altair
+
+streamlit>=1.40,<2.0
+tensorflow-cpu==2.20.0
+numpy>=1.26,<3.0
+pandas>=2.0,<3.0
+altair>=5.0,<7.0
 bdshare
-tensorflow
-scikit-learn
+scikit-learn>=1.4,<2.0
 
 ## Run locally
 ```bash
