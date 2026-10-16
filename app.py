@@ -441,3 +441,11 @@ This is a teaching project, not investment advice.
 """
     )
 
+import importlib.util
+import streamlit as st
+
+st.write(
+    "bdshare installed:",
+    importlib.util.find_spec("bdshare") is not None
+)
+
