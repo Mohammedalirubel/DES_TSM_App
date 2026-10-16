@@ -1,0 +1,7 @@
+streamlit>=1.40
+pandas
+numpy
+altair
+bdshare
+tensorflow-cpu
+scikit-learn
