@@ -12,6 +12,15 @@ altair>=5.0,<7.0
 bdshare
 scikit-learn>=1.4,<2.0
 
+##requirements.txt.txt
+   streamlit>=1.40
+   pandas
+   numpy
+   altair
+   bdshare
+   tensorflow-cpu
+   scikit-learn
+
 ## Run locally
 ```bash
 pip install -r requirements.txt
