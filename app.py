@@ -457,6 +457,14 @@ try:
 
 except Exception as e:
     st.error(f"{type(e).__name__}: {e}")
+st.error("The Dhaka Stock Exchange feed didn't respond.")
+except Exception:
+    st.error("The Dhaka Stock Exchange feed didn't respond.")
+
+except Exception as e:
+    st.error("The Dhaka Stock Exchange feed didn't respond.")
+    st.warning(f"Error type: {type(e).__name__}")
+    st.code(str(e))
 
 
 
