@@ -437,34 +437,41 @@ To look further ahead, it feeds each prediction back in as if it had happened.
 - DSE holidays aren't modelled, so session counts can be off by a day or two.
 - Prices come from the DSE via the `bdshare` library for the last {LOOKBACK_DAYS} days and refresh every 6 hours.
 
-This is a teaching project, not investment advice.
-"""
-    )
-    
+File "/mount/src/des_tsm_app/app.py", line 461
+    except Exception:
+    ^
+SyntaxError: invalid syntax
+
 import streamlit as st
 
 try:
     from bdshare import get_current_trade_data
 
-    with st.spinner("Testing DSE price feed..."):
-        df = get_current_trade_data()
+    with st.spinner("Loading DSE prices..."):
+        prices = get_current_trade_data()
 
-    if df is not None and not df.empty:
-        st.success(f"Loaded {len(df)} DSE records.")
-        st.dataframe(df.head())
-    else:
+    if prices is None or prices.empty:
         st.warning("The DSE feed returned no records.")
-
-except Exception as e:
-    st.error(f"{type(e).__name__}: {e}")
-st.error("The Dhaka Stock Exchange feed didn't respond.")
-except Exception:
-    st.error("The Dhaka Stock Exchange feed didn't respond.")
+    else:
+        st.success(f"Loaded {len(prices)} records.")
+        st.dataframe(prices.head())
 
 except Exception as e:
     st.error("The Dhaka Stock Exchange feed didn't respond.")
     st.warning(f"Error type: {type(e).__name__}")
     st.code(str(e))
+try:
+    prices = get_current_trade_data()
 
+except Exception:
+    st.error("Prices didn't load.")
 
+    except Exception:
+        st.warning("Connection failed.")
+        try:
+    prices = get_current_trade_data()
 
+except Exception as e:
+    st.error("Prices didn't load.")
+    st.warning(f"Error type: {type(e).__name__}")
+    st.code(str(e))
