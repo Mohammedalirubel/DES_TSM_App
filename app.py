@@ -1,4 +1,4 @@
-"""DSE Price Forecast: a phone-first Streamlit app built from predictive_analytics_LSTM.ipynb.
+""DSE Price Forecast: a phone-first Streamlit app built from predictive_analytics_LSTM.ipynb.
 
 Same method as the notebook: one small LSTM per share, 20-session window, closing
 price only, time-based 80/20 split, recursive multi-step forecast over Sun-Thu sessions.
@@ -6,8 +6,11 @@ price only, time-based 80/20 split, recursive multi-step forecast over Sun-Thu s
 from __future__ import annotations
 
 import html
+import importlib
 import inspect
 import re
+import subprocess
+import sys
 from datetime import date, timedelta
 
 import altair as alt
@@ -136,8 +139,19 @@ def to_frame(norm: pd.DataFrame) -> pd.DataFrame:
     return out[~bad].sort_values(["code", "date"]).reset_index(drop=True)
 
 
+def ensure_bdshare() -> None:
+    """Stopgap: install bdshare at runtime if requirements.txt did not provide it.
+    The proper fix is still to list `bdshare` in requirements.txt and reboot the app."""
+    try:
+        import bdshare  # noqa: F401
+    except ModuleNotFoundError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "bdshare"])
+        importlib.invalidate_caches()
+
+
 @st.cache_data(ttl=6 * 3600, show_spinner=False)
 def fetch_dse(today_iso: str) -> pd.DataFrame:
+    ensure_bdshare()
     from bdshare import get_historical_data
 
     end = date.fromisoformat(today_iso)
