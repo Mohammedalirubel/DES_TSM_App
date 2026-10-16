@@ -6,11 +6,8 @@ price only, time-based 80/20 split, recursive multi-step forecast over Sun-Thu s
 from __future__ import annotations
 
 import html
-import importlib
 import inspect
 import re
-import subprocess
-import sys
 from datetime import date, timedelta
 
 import altair as alt
@@ -139,19 +136,8 @@ def to_frame(norm: pd.DataFrame) -> pd.DataFrame:
     return out[~bad].sort_values(["code", "date"]).reset_index(drop=True)
 
 
-def ensure_bdshare() -> None:
-    """Stopgap: install bdshare at runtime if requirements.txt did not provide it.
-    The proper fix is still to list `bdshare` in requirements.txt and reboot the app."""
-    try:
-        import bdshare  # noqa: F401
-    except ModuleNotFoundError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "bdshare"])
-        importlib.invalidate_caches()
-
-
 @st.cache_data(ttl=6 * 3600, show_spinner=False)
 def fetch_dse(today_iso: str) -> pd.DataFrame:
-    ensure_bdshare()
     from bdshare import get_historical_data
 
     end = date.fromisoformat(today_iso)
@@ -189,6 +175,11 @@ def load_data() -> tuple[pd.DataFrame, str]:
         st.markdown("### Prices didn't load")
         st.write("The Dhaka Stock Exchange feed didn't respond. You can try again or use another source.")
         st.caption(f"Reason ({type(exc).__name__}): {exc}")
+        if isinstance(exc, ModuleNotFoundError):
+            st.warning(
+                f"The package '{exc.name}' is not installed on this server. Add it to requirements.txt "
+                "(in the repo root, next to app.py), push, then reboot the app."
+            )
         if st.button("Try again", type="primary", **STRETCH):
             st.rerun()
         up = st.file_uploader("Or upload a CSV with DATE, TRADING CODE and CLOSEP* columns", type="csv")
