@@ -1,4 +1,4 @@
-""DSE Price Forecast: a phone-first Streamlit app built from predictive_analytics_LSTM.ipynb.
+"""DSE Price Forecast: a phone-first Streamlit app built from predictive_analytics_LSTM.ipynb.
 
 Same method as the notebook: one small LSTM per share, 20-session window, closing
 price only, time-based 80/20 split, recursive multi-step forecast over Sun-Thu sessions.
