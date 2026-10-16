@@ -6,7 +6,7 @@ price only, time-based 80/20 split, recursive multi-step forecast over Sun-Thu s
 from __future__ import annotations
 
 import html
-import io
+import inspect
 import re
 from datetime import date, timedelta
 
@@ -52,6 +52,12 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
+
+# Newer Streamlit uses width="stretch"; older versions use use_container_width=True.
+if "width" in inspect.signature(st.button).parameters:
+    STRETCH = {"width": "stretch"}
+else:
+    STRETCH = {"use_container_width": True}
 
 # --------------------------------------------------------------------------------------
 # Styling: a single phone-width column, one bold forecast card, quiet everything else
@@ -168,8 +174,8 @@ def load_data() -> tuple[pd.DataFrame, str]:
     except Exception as exc:  # network, DSE downtime, library change
         st.markdown("### Prices didn't load")
         st.write("The Dhaka Stock Exchange feed didn't respond. You can try again or use another source.")
-        st.caption(f"Reason: {exc}")
-        if st.button("Try again", type="primary", width="stretch"):
+        st.caption(f"Reason ({type(exc).__name__}): {exc}")
+        if st.button("Try again", type="primary", **STRETCH):
             st.rerun()
         up = st.file_uploader("Or upload a CSV with DATE, TRADING CODE and CLOSEP* columns", type="csv")
         if up is not None:
@@ -179,7 +185,7 @@ def load_data() -> tuple[pd.DataFrame, str]:
                 st.rerun()
             except Exception as err:
                 st.error(f"That file couldn't be read: {err}")
-        if st.button("Explore with demo data", width="stretch"):
+        if st.button("Explore with demo data", **STRETCH):
             st.session_state["source"] = "demo"
             st.rerun()
         st.stop()
@@ -211,7 +217,12 @@ def train_lstm(code: str, last_date: str, prices: tuple):
     train_mask, test_mask = target_idx < train_size, target_idx >= train_size
 
     model = keras.Sequential(
-        [keras.layers.Input(shape=(WINDOW, 1)), keras.layers.LSTM(32), keras.layers.Dense(16, activation="relu"), keras.layers.Dense(1)]
+        [
+            keras.layers.Input(shape=(WINDOW, 1)),
+            keras.layers.LSTM(32),
+            keras.layers.Dense(16, activation="relu"),
+            keras.layers.Dense(1),
+        ]
     )
     model.compile(optimizer="adam", loss="mse")
     hist = model.fit(X[train_mask], y[train_mask], epochs=EPOCHS, batch_size=BATCH_SIZE,
@@ -223,7 +234,10 @@ def train_lstm(code: str, last_date: str, prices: tuple):
     actual = arr[WINDOW:, 0][test_mask]
     previous = arr[WINDOW - 1 : -1, 0][test_mask]
     moved = actual != previous
-    direction = float(np.mean(np.sign(pred - previous)[moved] == np.sign(actual - previous)[moved])) * 100 if moved.any() else float("nan")
+    if moved.any():
+        direction = float(np.mean(np.sign(pred - previous)[moved] == np.sign(actual - previous)[moved])) * 100
+    else:
+        direction = float("nan")
     metrics = {
         "mae": float(np.mean(np.abs(pred - actual))),
         "naive_mae": float(np.mean(np.abs(previous - actual))),
@@ -266,7 +280,8 @@ def forecast_chart(history: pd.DataFrame, fc: pd.DataFrame) -> alt.Chart:
     base = alt.Chart(data).encode(
         x=alt.X("date:T", title=None, axis=alt.Axis(format="%d %b", labelAngle=0, tickCount=4, grid=False)),
         y=alt.Y("close:Q", title=None, scale=alt.Scale(zero=False), axis=alt.Axis(gridColor=GRID, tickCount=5)),
-        color=alt.Color("series:N", scale=alt.Scale(domain=domain, range=[INK, TEAL]), legend=alt.Legend(orient="bottom", title=None)),
+        color=alt.Color("series:N", scale=alt.Scale(domain=domain, range=[INK, TEAL]),
+                        legend=alt.Legend(orient="bottom", title=None)),
         strokeDash=alt.StrokeDash("series:N", scale=alt.Scale(domain=domain, range=[[1, 0], [6, 4]]), legend=None),
         tooltip=[alt.Tooltip("date:T", format="%a %d %b"), alt.Tooltip("close:Q", format=",.2f", title="Close")],
     )
@@ -299,7 +314,7 @@ data, source = load_data()
 if source != "dse":
     label = "uploaded CSV" if source == "csv" else "demo data (synthetic prices, not real shares)"
     st.markdown(f'<div class="demo">Using {label}.</div>', unsafe_allow_html=True)
-    if st.button("Switch back to live DSE data", width="stretch"):
+    if st.button("Switch back to live DSE data", **STRETCH):
         st.session_state["source"] = "dse"
         st.rerun()
 
@@ -309,29 +324,42 @@ if not codes:
     st.error("No share has enough price history to train a model. Try a longer date range.")
     st.stop()
 
-code = st.selectbox("Share", codes, index=codes.index("BRACBANK") if "BRACBANK" in codes else 0,
-                    help="Tap and type to search trading codes.")
+code = st.selectbox(
+    "Share", codes,
+    index=codes.index("BRACBANK") if "BRACBANK" in codes else 0,
+    help="Tap and type to search trading codes.",
+)
 horizon = st.segmented_control("How far ahead", [*HORIZONS, "Pick date"], default="1 week") or "1 week"
 
 series = data[data["code"] == code].drop_duplicates("date", keep="last").sort_values("date").reset_index(drop=True)
 last_date, last_close = series["date"].iloc[-1], float(series["close"].iloc[-1])
 age = (pd.Timestamp.today().normalize() - last_date).days
 if source == "dse" and age > 7:
-    st.markdown(f'<div class="note">The latest price for {html.escape(code)} is from {last_date:%d %b %Y}, {age} days ago. It may not be trading.</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="note">The latest price for {html.escape(code)} is from {last_date:%d %b %Y}, {age} days ago. It may not be trading.</div>',
+        unsafe_allow_html=True,
+    )
 
 custom_target = None
 if horizon == "Pick date":
     custom_target = pd.Timestamp(
-        st.date_input("Target date", value=(last_date + pd.Timedelta(days=7)).date(),
-                      min_value=(last_date + pd.Timedelta(days=1)).date(), max_value=(last_date + pd.Timedelta(days=120)).date())
+        st.date_input(
+            "Target date",
+            value=(last_date + pd.Timedelta(days=7)).date(),
+            min_value=(last_date + pd.Timedelta(days=1)).date(),
+            max_value=(last_date + pd.Timedelta(days=120)).date(),
+        )
     )
 
 tab_forecast, tab_history, tab_about = st.tabs(["Forecast", "History", "About"])
 
 with tab_forecast:
-    if st.button("Forecast price", type="primary", width="stretch"):
+    if st.button("Forecast price", type="primary", **STRETCH):
         try:
-            sessions = trading_sessions(last_date, n=HORIZONS[horizon]) if custom_target is None else trading_sessions(last_date, end=custom_target)
+            if custom_target is None:
+                sessions = trading_sessions(last_date, n=HORIZONS[horizon])
+            else:
+                sessions = trading_sessions(last_date, end=custom_target)
             if len(sessions) == 0:
                 raise ValueError("There is no trading session between the last price and that date (DSE trades Sunday to Thursday).")
             with st.spinner(f"Training the {code} model. The first run takes 10–20 seconds."):
@@ -366,12 +394,18 @@ with tab_forecast:
 
         hist = series.tail(60)[["date", "close"]]
         fc_df = pd.DataFrame({"date": [last_date, *dates], "close": [last_close, *preds]})
-        st.altair_chart(forecast_chart(hist, fc_df), width="stretch")
+        st.altair_chart(forecast_chart(hist, fc_df), **STRETCH)
 
         if len(dates) > 30:
-            st.markdown('<div class="note">Forecasts this far out are repeated one-step guesses, so errors pile up. Treat the number as a rough direction at best.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="note">Forecasts this far out are repeated one-step guesses, so errors pile up. Treat the number as a rough direction at best.</div>',
+                unsafe_allow_html=True,
+            )
         if target_pred <= 0:
-            st.markdown('<div class="note">The model predicted a price at or below zero, which can\'t happen. Ignore this forecast.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="note">The model predicted a price at or below zero, which can\'t happen. Ignore this forecast.</div>',
+                unsafe_allow_html=True,
+            )
 
         with st.expander("How reliable is this share's model?"):
             ratio = m["mae"] / m["naive_mae"] if m["naive_mae"] else float("nan")
@@ -386,20 +420,26 @@ with tab_forecast:
                 pd.DataFrame(
                     {
                         "Measure": ["Model error (BDT)", "\"Tomorrow = today\" error (BDT)", "Model error (%)", "Right direction", "Held-out days"],
-                        "Value": [f"{m['mae']:.2f}", f"{m['naive_mae']:.2f}", f"{m['mape']:.2f}%",
-                                  "n/a" if np.isnan(m["direction"]) else f"{m['direction']:.0f}% of moves", str(m["test_days"])],
+                        "Value": [
+                            f"{m['mae']:.2f}",
+                            f"{m['naive_mae']:.2f}",
+                            f"{m['mape']:.2f}%",
+                            "n/a" if np.isnan(m["direction"]) else f"{m['direction']:.0f}% of moves",
+                            str(m["test_days"]),
+                        ],
                     }
                 ),
-                hide_index=True, width="stretch",
+                hide_index=True,
+                **STRETCH,
             )
             st.caption("Errors come from predicting one day ahead on the last 20% of the data, which the model never trained on.")
 
         table = pd.DataFrame({"Date": dates.strftime("%a %d %b %Y"), "Predicted Close (BDT)": np.round(preds, 2)})
         table["Change vs last close"] = [f"{(p - last_close) / last_close * 100:+.2f}%" for p in preds]
         with st.expander("Day-by-day forecast"):
-            st.dataframe(table, hide_index=True, width="stretch")
+            st.dataframe(table, hide_index=True, **STRETCH)
         csv = pd.DataFrame({"Date": dates.strftime("%Y-%m-%d"), "Predicted Close (BDT)": np.round(preds, 2)}).to_csv(index=False)
-        st.download_button("Download forecast (CSV)", csv, file_name=f"DSE_{code}_LSTM_Forecast.csv", mime="text/csv", width="stretch")
+        st.download_button("Download forecast (CSV)", csv, file_name=f"DSE_{code}_LSTM_Forecast.csv", mime="text/csv", **STRETCH)
     elif not res:
         st.caption("Choose a share and how far ahead, then tap Forecast price.")
     else:
@@ -407,7 +447,7 @@ with tab_forecast:
 
 with tab_history:
     st.markdown(f"### {html.escape(code)} closing price")
-    st.altair_chart(history_chart(series[["date", "close"]]), width="stretch")
+    st.altair_chart(history_chart(series[["date", "close"]]), **STRETCH)
     recent = series.tail(21)
     chg = (recent["close"].iloc[-1] / recent["close"].iloc[0] - 1) * 100 if len(recent) > 1 else 0.0
     vol = series["volume"].tail(20).mean()
@@ -418,7 +458,9 @@ with tab_history:
         ("Average volume", "n/a" if pd.isna(vol) else f"{vol:,.0f}", "last 20 sessions"),
     ]
     st.markdown(
-        '<div class="stats">' + "".join(f'<div><span class="k">{k}</span><span class="v">{v}</span><span class="s">{s}</span></div>' for k, v, s in stats) + "</div>",
+        '<div class="stats">'
+        + "".join(f'<div><span class="k">{k}</span><span class="v">{v}</span><span class="s">{s}</span></div>' for k, v, s in stats)
+        + "</div>",
         unsafe_allow_html=True,
     )
 
@@ -436,42 +478,5 @@ To look further ahead, it feeds each prediction back in as if it had happened.
 - The further ahead you look, the less the number means.
 - DSE holidays aren't modelled, so session counts can be off by a day or two.
 - Prices come from the DSE via the `bdshare` library for the last {LOOKBACK_DAYS} days and refresh every 6 hours.
-
-File "/mount/src/des_tsm_app/app.py", line 461
-    except Exception:
-    ^
-SyntaxError: invalid syntax
-
-import streamlit as st
-
-try:
-    from bdshare import get_current_trade_data
-
-    with st.spinner("Loading DSE prices..."):
-        prices = get_current_trade_data()
-
-    if prices is None or prices.empty:
-        st.warning("The DSE feed returned no records.")
-    else:
-        st.success(f"Loaded {len(prices)} records.")
-        st.dataframe(prices.head())
-
-except Exception as e:
-    st.error("The Dhaka Stock Exchange feed didn't respond.")
-    st.warning(f"Error type: {type(e).__name__}")
-    st.code(str(e))
-try:
-    prices = get_current_trade_data()
-
-except Exception:
-    st.error("Prices didn't load.")
-
-    except Exception:
-        st.warning("Connection failed.")
-        try:
-    prices = get_current_trade_data()
-
-except Exception as e:
-    st.error("Prices didn't load.")
-    st.warning(f"Error type: {type(e).__name__}")
-    st.code(str(e))
+"""
+    )
