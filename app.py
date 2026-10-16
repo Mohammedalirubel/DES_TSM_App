@@ -17,6 +17,11 @@ import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
+import tensorflow as tf
+import bdshare
+
+print("TensorFlow:", tf.__version__)
+print("bdshare imported successfully")
 
 # --------------------------------------------------------------------------------------
 # Settings (match the notebook)
@@ -494,3 +499,5 @@ To look further ahead, it feeds each prediction back in as if it had happened.
 - Prices come from the DSE via the `bdshare` library for the last {LOOKBACK_DAYS} days and refresh every 6 hours.
 """
     )
+@st.cache_resource(show_spinner=False, max_entries=10)
+def train_lstm(code, last_date, prices):
