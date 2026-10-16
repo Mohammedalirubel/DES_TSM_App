@@ -440,34 +440,23 @@ To look further ahead, it feeds each prediction back in as if it had happened.
 This is a teaching project, not investment advice.
 """
     )
-
-
+    
 import streamlit as st
 
-with st.expander("DSE Feed Diagnostic"):
-    if st.button("Test DSE Connection"):
-        try:
-            import bdshare
+try:
+    from bdshare import get_current_trade_data
 
-            st.write(
-                "bdshare version:",
-                getattr(bdshare, "__version__", "Unknown")
-            )
+    with st.spinner("Testing DSE price feed..."):
+        df = get_current_trade_data()
 
-            from bdshare import get_current_trade_data
+    if df is not None and not df.empty:
+        st.success(f"Loaded {len(df)} DSE records.")
+        st.dataframe(df.head())
+    else:
+        st.warning("The DSE feed returned no records.")
 
-            with st.spinner("Connecting to DSE..."):
-                prices = get_current_trade_data()
+except Exception as e:
+    st.error(f"{type(e).__name__}: {e}")
 
-            if prices is None or prices.empty:
-                st.warning("DSE returned no price records.")
-            else:
-                st.success(
-                    f"Loaded {len(prices)} DSE records."
-                )
-                st.dataframe(prices.head(10))
 
-        except Exception as e:
-            st.error(f"Data retrieval failed: {type(e).__name__}")
-            st.code(str(e))
 
