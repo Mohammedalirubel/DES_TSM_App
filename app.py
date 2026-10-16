@@ -441,11 +441,33 @@ This is a teaching project, not investment advice.
 """
     )
 
-import importlib.util
+
 import streamlit as st
 
-st.write(
-    "bdshare installed:",
-    importlib.util.find_spec("bdshare") is not None
-)
+with st.expander("DSE Feed Diagnostic"):
+    if st.button("Test DSE Connection"):
+        try:
+            import bdshare
+
+            st.write(
+                "bdshare version:",
+                getattr(bdshare, "__version__", "Unknown")
+            )
+
+            from bdshare import get_current_trade_data
+
+            with st.spinner("Connecting to DSE..."):
+                prices = get_current_trade_data()
+
+            if prices is None or prices.empty:
+                st.warning("DSE returned no price records.")
+            else:
+                st.success(
+                    f"Loaded {len(prices)} DSE records."
+                )
+                st.dataframe(prices.head(10))
+
+        except Exception as e:
+            st.error(f"Data retrieval failed: {type(e).__name__}")
+            st.code(str(e))
 
