@@ -22,7 +22,7 @@ WINDOW = 20
 TRAIN_RATIO = 0.80
 EPOCHS = 15
 BATCH_SIZE = 16
-LOOKBACK_DAYS = 150
+LOOKBACK_DAYS = 730  # approximately two calendar years
 WEEKMASK = "Sun Mon Tue Wed Thu"  # DSE trading week (public holidays are not modelled)
 HORIZONS = {"Next day": 1, "1 week": 5, "2 weeks": 10, "1 month": 22}
 
@@ -478,10 +478,11 @@ To look further ahead, it feeds each prediction back in as if it had happened.
 **Held-out check.** The model trains on the first 80% of the price history. The last 20% is kept aside, and the
 "How reliable" panel scores the model on those days against the simple guess that tomorrow's close equals today's.
 
+**Historical data.** The app requests approximately {LOOKBACK_DAYS} calendar days (about two years) from DSE via `bdshare`, with results cached for six hours. The actual available dates depend on the exchange data source.
+
 **Limits to keep in mind**
 - It only sees closing prices. News, volume, and market-wide moves aren't in the model.
 - The further ahead you look, the less the number means.
 - DSE holidays aren't modelled, so session counts can be off by a day or two.
-- Prices come from the DSE via the `bdshare` library for the last {LOOKBACK_DAYS} days and refresh every 6 hours.
 """
     )
