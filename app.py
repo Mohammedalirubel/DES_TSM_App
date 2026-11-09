@@ -1,3 +1,17 @@
+from __future__ import annotations
+
+from datetime import date
+
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+# Constants used by train_lstm and load_data
+WINDOW = 30
+TRAIN_RATIO = 0.8
+EPOCHS = 20
+BATCH_SIZE = 32
+STRETCH = {"use_container_width": True}
 # --------------------------------------------------------------------------------------
 # Data
 # --------------------------------------------------------------------------------------
